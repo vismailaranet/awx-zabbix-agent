@@ -3,19 +3,63 @@
   hosts: all
   become: true
 
+  vars:
+    zabbix_server_ip: "10.63.0.9"
+    zabbix_version: "6.0"
+
   tasks:
+    - name: Remover possíveis locks do apt
+      shell: |
+        rm -f /var/lib/apt/lists/lock
+        rm -f /var/cache/apt/archives/lock
+        rm -f /var/lib/dpkg/lock*
+        dpkg --configure -a
+      args:
+        warn: false
+
     - name: Atualizar cache APT
       apt:
         update_cache: yes
+        cache_valid_time: 3600
 
-    - name: Instalar zabbix-agent
+    - name: Baixar pacote do repositório Zabbix
+      get_url:
+        url: "https://repo.zabbix.com/zabbix/{{ zabbix_version }}/ubuntu/pool/main/z/zabbix-release/zabbix-release_{{ zabbix_version }}-4+ubuntu{{ ansible_distribution_version }}_all.deb"
+        dest: /tmp/zabbix-release.deb
+
+    - name: Instalar repositório Zabbix
+      apt:
+        deb: /tmp/zabbix-release.deb
+
+    - name: Atualizar cache APT após adicionar repositório
+      apt:
+        update_cache: yes
+
+    - name: Instalar Zabbix Agent
       apt:
         name: zabbix-agent
         state: present
 
-    - name: Habilitar e iniciar serviço
-      service:
-        name: zabbix-agent
-        state: started
-        enabled: yes
+    - name: Configurar Server
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^Server='
+        line: "Server={{ zabbix_server_ip }}"
 
+    - name: Configurar ServerActive
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^ServerActive='
+        line: "ServerActive={{ zabbix_server_ip }}"
+
+    - name: Configurar Hostname
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^Hostname='
+        line: "Hostname={{ inventory_hostname }}"
+
+    - name: Habilitar e iniciar Zabbix Agent
+      systemd:
+        name: zabbix-agent
+        enabled: true
+        state: restarted
