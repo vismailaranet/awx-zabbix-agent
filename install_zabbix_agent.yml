@@ -1,0 +1,21 @@
+---
+- name: Instalar Zabbix Agent em servidores Ubuntu
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Atualizar cache APT
+      apt:
+        update_cache: yes
+
+    - name: Instalar zabbix-agent
+      apt:
+        name: zabbix-agent
+        state: present
+
+    - name: Habilitar e iniciar serviço
+      service:
+        name: zabbix-agent
+        state: started
+        enabled: yes
+
