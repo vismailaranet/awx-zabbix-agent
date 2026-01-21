@@ -8,19 +8,18 @@
     zabbix_version: "6.0"
 
   tasks:
-    - name: Remover possíveis locks do apt
-      shell: |
-        rm -f /var/lib/apt/lists/lock
-        rm -f /var/cache/apt/archives/lock
-        rm -f /var/lib/dpkg/lock*
-        dpkg --configure -a
-      args:
-        warn: false
-
     - name: Atualizar cache APT
       apt:
         update_cache: yes
         cache_valid_time: 3600
+
+    - name: Instalar dependências básicas
+      apt:
+        name:
+          - wget
+          - gnupg
+          - lsb-release
+        state: present
 
     - name: Baixar pacote do repositório Zabbix
       get_url:
