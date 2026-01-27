@@ -1,13 +1,25 @@
 ---
-- name: Instalar Zabbix Agent em servidores Ubuntu
+- name: Instalar Zabbix Agent em servidores Debian e Ubuntu
   hosts: all
   become: true
+  gather_facts: true
 
   vars:
     zabbix_server_ip: "10.63.0.9"
     zabbix_version: "7.0"
 
   tasks:
+    # =========================
+    # Identificação da distro
+    # =========================
+    - name: Definir distro e release
+      set_fact:
+        zabbix_os: "{{ ansible_distribution | lower }}"
+        zabbix_release: "{{ ansible_distribution_release }}"
+
+    # =========================
+    # Atualização do sistema
+    # =========================
     - name: Atualizar cache APT
       apt:
         update_cache: yes
@@ -21,24 +33,35 @@
           - lsb-release
         state: present
 
+    # =========================
+    # Baixar repositório Zabbix
+    # =========================
     - name: Baixar pacote do repositório Zabbix
       get_url:
-        url: "https://repo.zabbix.com/zabbix/{{ zabbix_version }}/ubuntu/pool/main/z/zabbix-release/zabbix-release_{{ zabbix_version }}-2+ubuntu24.04_all.deb"
+        url: "https://repo.zabbix.com/zabbix/{{ zabbix_version }}/{{ zabbix_os }}/pool/main/z/zabbix-release/zabbix-release_{{ zabbix_version }}-2+{{ zabbix_os }}{{ ansible_distribution_version }}_all.deb"
         dest: /tmp/zabbix-release.deb
+      when: zabbix_os in ['ubuntu', 'debian']
 
     - name: Instalar repositório Zabbix
       apt:
         deb: /tmp/zabbix-release.deb
+      when: zabbix_os in ['ubuntu', 'debian']
 
     - name: Atualizar cache APT após adicionar repositório
       apt:
         update_cache: yes
 
+    # =========================
+    # Instalação do Agent
+    # =========================
     - name: Instalar Zabbix Agent
       apt:
         name: zabbix-agent
         state: present
 
+    # =========================
+    # Configuração do Agent
+    # =========================
     - name: Configurar Server
       lineinfile:
         path: /etc/zabbix/zabbix_agentd.conf
@@ -57,6 +80,9 @@
         regexp: '^Hostname='
         line: "Hostname={{ inventory_hostname }}"
 
+    # =========================
+    # Serviço
+    # =========================
     - name: Habilitar e iniciar Zabbix Agent
       systemd:
         name: zabbix-agent
